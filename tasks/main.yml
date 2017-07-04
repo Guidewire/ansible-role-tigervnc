@@ -1,0 +1,58 @@
+- name: install packages
+  win_chocolatey: name={{ item }} upgrade=true
+  with_items:
+    - tigervnc
+  tags: choco
+
+- name: put ansible_managed to tmp to read it later as it's available only in win_template
+  win_template:
+    dest: '%TEMP%/ansible_managed'
+    src: ansible_managed.j2
+  changed_when: no
+
+- win_shell: type ansible_managed
+             chdir='%TEMP%'
+  register: ansible_managed
+  changed_when: no
+
+- name: register and start tigervnc
+  win_service:
+    name: TigerVNC
+    display_name: TigerVNC Server
+    description: Provides remote access to this machine via the VNC/RFB protocol.{{ ansible_managed.stdout }}
+    start_mode: auto
+    state: started
+    path: '"%PROGRAMFILES%\TigerVNC\winvnc4.exe" -service'
+    
+- name: set password
+  win_regedit:
+    path: HKLM:\SOFTWARE\TigerVNC\WinVNC4
+    name: "{{ item.name }}"
+    data: "{{ item.data }}"
+    type: "{{ item.type }}"
+  with_items:
+    - { name: "Password", data: "hex:{{ tigervnc_password|vnc_encrypt }}", type: "binary"}
+    - { name: "SecurityTypes", data: "VeNCrypt,TLSVnc,VncAuth", type: "string"}
+    - { name: "QueryConnect", data: "00000000", type: "dword"}
+    - { name: "QueryOnlyIfLoggedOn", data: "00000000", type: "dword"}
+  tags: reg
+  
+- name: Allow connections on 5900 and 5800
+  win_firewall_rule:
+    name: "{{ item.name }}"
+    localport: "{{ item.port }}"
+    action: allow
+    direction: in
+    protocol: tcp
+    state: present
+    enabled: yes
+  with_items:
+    - { name: VNC, port: 5900 }
+    - { name: VNC web, port: 5800 }
+  tags: fw
+
+- name: verify VNC port is accessible
+  local_action:
+    wait_for host="{{ ansible_host }}" port=5900 delay=10
+  tags: test
+  become: no
