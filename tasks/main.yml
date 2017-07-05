@@ -14,22 +14,11 @@
     - tigervnc
   tags: choco
 
-- name: put ansible_managed to tmp to read it later as it's available only in win_template
-  win_template:
-    dest: '%TEMP%/ansible_managed'
-    src: ansible_managed.j2
-  changed_when: no
-
-- win_shell: type ansible_managed
-             chdir='%TEMP%'
-  register: ansible_managed
-  changed_when: no
-
 - name: register and start tigervnc
   win_service:
     name: TigerVNC
     display_name: TigerVNC Server
-    description: Provides remote access to this machine via the VNC/RFB protocol.{{ ansible_managed.stdout }}
+    description: Provides remote access to this machine via the VNC/RFB protocol.
     start_mode: auto
     state: started
     path: '"%PROGRAMFILES%\TigerVNC\winvnc4.exe" -service'
