@@ -1,5 +1,15 @@
+- name: get choco version
+  win_command: choco
+  register: choco_out
+  failed_when: no
+  changed_when: no
+
+- name: upgrade choco if it's older than v0.9.10
+  win_command: choco upgrade -y chocolatey
+  when: (choco_out.stdout_lines|map('regex_search','^Chocolatey v\d+(\.\d+)+$')|select('string')|list)[0].split()[1]|version_compare('v0.9.10', '<')
+
 - name: install packages
-  win_chocolatey: name={{ item }} upgrade=true
+  win_chocolatey: name={{ item }} state=latest
   with_items:
     - tigervnc
   tags: choco
